@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkillRank Student Table</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f8f9fa;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background-color: #007bff;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 15px 30px;
+      width: 100%;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      position: relative;
+    }
+    .logo-container {
+      position: absolute;
+      left: 15px;
+      display: flex;
+      align-items: center;
+    }
+    .logo-container img {
+      width: 70px;
+      height: auto;
+    }
+    .header-content {
+      text-align: center;
+    }
+    .header-content h1 {
+      font-size: 2rem;
+      margin: 0;
+    }
+    .header-content p {
+      margin: 5px 0;
+      font-size: 1rem;
+      color: #cce5ff;
+    }
+    .container {
+      max-width: 90%;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #007bff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    thead {
+      background-color: #007bff;
+      color: white;
+    }
+    th, td {
+      padding: 15px;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05rem;
+    }
+    th i {
+      margin-right: 8px;
+    }
+    td {
+      background-color: #f8f9fa;
+    }
+    tr:nth-child(even) td {
+      background-color: #e9ecef;
+    }
+    /*tr:hover {*/
+    /*  background-color: #f1f1f1;*/
+    /*}*/
+    .blurred {
+      filter: blur(4px);
+      color: transparent;
+      text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    }
+    .unblurred {
+      filter: none;
+      color: black;
+      text-shadow: none;
+    }
+    .download-btn {
+      background-color: #28a745;
+      color: white;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .download-btn:hover {
+      background-color: #218838;
+    }
+    .filter-container, .access-container, .download-container {
+      margin: 20px auto;
+      text-align: center;
+    }
+    input[type="password"], input[type="text"], select {
+      padding: 10px 15px;
+      font-size: 1rem;
+      margin-right: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      outline: none;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .message {
+      margin-top: 10px;
+      font-size: 1rem;
+    }
+    .message.success {
+      color: green;
+    }
+    .message.error {
+      color: red;
+    }
+    td, th {
+      user-select: none;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    let students = [];
+    let filteredStudents = [];
+    let courseAccess = {};
+    let courseTimers = {};
+    const protectedKey = "downloadkey123";
+    let sortDirection = true;
+
+    async function loadStudents() {
+      try {
+        const response = await fetch("https://api.skillrank.online/public/api/getrecords");
+        if (!response.ok) {
+          throw new Error("Failed to fetch data.");
+        }
+        const data = await response.json();
+        students = data.map(student => ({
+          name: student.name,
+          role: student.current_role,
+          course: student.course,
+          grade: student.grade,
+          email: student.email,
+          mobile: student.phone,
+          university: student.university_name,
+          place: student.place,
+          linkedin: student.linkedin
+        }));
+        filteredStudents = students;
+        displayMainTable();
+        populateCourseFilter();
+      } catch (error) {
+        console.error("Error loading student data:", error);
+        alert("Unable to load student data. Please try again later.");
+      }
+    }
+
+    function displayMainTable() {
+      const tableBody = document.getElementById('studentTableBody');
+      tableBody.innerHTML = '';
+      filteredStudents.forEach(student => {
+        const isAccessGranted = courseAccess[student.course] || false;
+        const blurClass = isAccessGranted ? 'unblurred' : 'blurred';
+        const pointerStyle = isAccessGranted ? 'pointer-events: auto;' : 'pointer-events: none;'; 
+
+        const row = tableBody.insertRow();
+        row.innerHTML = `
+          <td>${student.name}</td>
+          <td>${student.role}</td>
+          <td>${student.course}</td>
+          <td>${student.grade}</td>
+          <td class="${blurClass}">${student.email}</td>
+          <td class="${blurClass}">${student.mobile}</td>
+          <td class="${blurClass}">${student.university}</td>
+          <td class="${blurClass}">${student.place}</td>
+          <td class="${blurClass}">
+            <a href="${student.linkedin}" target="_blank" style="${pointerStyle}">${student.linkedin}</a>
+          </td>
+          <td><button class="download-btn" onclick="downloadStudentData('${student.name}', '${student.email}', '${student.mobile}', '${student.course}', '${student.grade}', '${student.university}', '${student.linkedin}')">Download</button></td>
+        `;
+      });
+    }
+
+    function populateCourseFilter() {
+      const courseFilter = document.getElementById('courseFilter');
+      const courses = [...new Set(students.map(student => student.course))];
+      courseFilter.innerHTML = `<option value="">All Courses</option>`;
+      courses.forEach(course => {
+        const option = document.createElement('option');
+        option.value = course;
+        option.textContent = course;
+        courseFilter.appendChild(option);
+      });
+    }
+
+    function filterByCourse() {
+      const selectedCourse = document.getElementById('courseFilter').value;
+      filteredStudents = selectedCourse
+        ? students.filter(student => student.course === selectedCourse)
+        : students;
+      displayMainTable();
+    }
+
+    function requestAccessForCourse() {
+      const selectedCourse = document.getElementById('courseFilter').value;
+      const passwordInput = document.getElementById('passwordInput');
+      const message = document.getElementById('message');
+      const password = passwordInput.value;
+
+      if (!selectedCourse) {
+        message.textContent = "Please select a course first.";
+        message.className = "message error";
+        return;
+      }
+
+      if (password === "admin123") {
+        courseAccess[selectedCourse] = true;
+        message.textContent = `Access granted for ${selectedCourse}! Details will be visible for 10 minutes.`;
+        message.className = "message success";
+        displayMainTable();
+        if (courseTimers[selectedCourse]) {
+          clearTimeout(courseTimers[selectedCourse]);
+        }
+        courseTimers[selectedCourse] = setTimeout(() => {
+          courseAccess[selectedCourse] = false;
+          message.textContent = `Access expired for ${selectedCourse}. Please re-enter the password.`;
+          message.className = "message error";
+          displayMainTable();
+        }, 600000);
+      } else {
+        message.textContent = "Incorrect password. Try again.";
+        message.className = "message error";
+      }
+    }
+
+    function downloadStudentData(name, email, mobile, course, grade, university, linkedin) {
+      const inputPassword = prompt("Enter the download key:");
+      if (inputPassword === protectedKey) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text(`Student Data for ${name}`, 10, 10);
+        doc.text(`Email: ${email}`, 10, 20);
+        doc.text(`Mobile: ${mobile}`, 10, 30);
+        doc.text(`Course: ${course}`, 10, 40);
+        doc.text(`Grade: ${grade}`, 10, 50);
+        doc.text(`University: ${university}`, 10, 60);
+        doc.text(`LinkedIn: ${linkedin}`, 10, 70);
+        doc.save(`${name}_Details.pdf`);
+      } else {
+        alert("Incorrect download key.");
+      }
+    }
+
+    function sortByGrade() {
+      const sortIcon = document.getElementById('gradeSort');
+      sortDirection = !sortDirection;
+      const sortedStudents = [...filteredStudents].sort((a, b) => {
+        const gradeA = a.grade.toLowerCase();
+        const gradeB = b.grade.toLowerCase();
+        
+        if (sortDirection) {
+          return gradeA > gradeB ? 1 : -1;
+        } else {
+          return gradeA < gradeB ? 1 : -1;
+        }
+      });
+
+      filteredStudents = sortedStudents;
+      displayMainTable();
+
+      if (sortDirection) {
+        sortIcon.classList.add('fa-sort-up');
+        sortIcon.classList.remove('fa-sort-down');
+      } else {
+        sortIcon.classList.add('fa-sort-down');
+        sortIcon.classList.remove('fa-sort-up');
+      }
+    }
+
+    window.onload = loadStudents;
+  </script>
+</head>
+<body>
+
+  <header>
+    <div class="logo-container">
+      <img src="https://skillrank.online/images/newlogo.jpeg" alt="SkillRank Logo">
+    </div>
+    <div class="header-content">
+      <h1>SkillRank Student Records</h1>
+      <p>Your portal to student data and course access</p>
+    </div>
+  </header>
+
+  <div class="container">
+    <h2>Student Table</h2>
+    <div class="filter-container">
+      <label for="courseFilter">Filter by Course: </label>
+      <select id="courseFilter" onchange="filterByCourse()">
+        <option value="">All Courses</option>
+      </select>
+    </div>
+
+    <div class="access-container">
+      <input type="password" id="passwordInput" placeholder="Enter Password to Unlock Courses">
+      <button onclick="requestAccessForCourse()">Request Access</button>
+      <div id="message"></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th><i class="fas fa-user"></i>Name</th>
+          <th><i class="fas fa-user-tag"></i>Role</th>
+          <th><i class="fas fa-book"></i>Course</th>
+          <th><i class="fas fa-star"></i>Grade <i class="fa fa-sort" id="gradeSort" onclick="sortByGrade()"></i></th>
+          <th><i class="fas fa-envelope"></i>Email</th>
+          <th><i class="fas fa-phone"></i>Mobile</th>
+          <th><i class="fas fa-university"></i>University</th>
+          <th><i class="fas fa-map-marker-alt"></i>Place</th>
+          <th><i class="fas fa-link"></i>LinkedIn</th>
+          <th><i class="fas fa-download"></i>Action</th>
+        </tr>
+      </thead>
+      <tbody id="studentTableBody">
+      </tbody>
+    </table>
+
+    
+  </div>
+
+</body>
+</html>
